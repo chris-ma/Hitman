@@ -1,0 +1,199 @@
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: #f2ede2;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* Crosshair */
+.hud-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+}
+.hud-crosshair::before,
+.hud-crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(245, 240, 225, 0.9);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+.hud-crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+.hud-crosshair::after {
+  top: 50%;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  transform: translateY(-50%);
+}
+
+/* Hit marker: rotated X that flashes on confirmed hits */
+.hud-hitmarker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.18s ease-out;
+}
+.hud-hitmarker::before,
+.hud-hitmarker::after {
+  content: '';
+  position: absolute;
+  background: #ff5544;
+}
+.hud-hitmarker::before {
+  left: 50%;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+.hud-hitmarker::after {
+  top: 50%;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  transform: translateY(-50%);
+}
+.hud-hitmarker.show {
+  opacity: 1;
+  transition: none;
+}
+
+/* Damage vignette */
+.hud-damage {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 120px 40px rgba(200, 20, 20, 0.55);
+  opacity: 0;
+  transition: opacity 0.4s ease-out;
+}
+.hud-damage.show {
+  opacity: 1;
+  transition: none;
+}
+
+/* Bottom-left vitals */
+.hud-vitals {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hud-healthbar {
+  width: 240px;
+  height: 14px;
+  background: rgba(10, 10, 14, 0.55);
+  border: 1px solid rgba(245, 240, 225, 0.35);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.hud-healthbar-fill {
+  height: 100%;
+  width: 100%;
+  background: #7fc96b;
+  transition: width 0.15s ease-out, background-color 0.15s;
+}
+.hud-healthbar-fill.low {
+  background: #d8452f;
+}
+
+/* Bottom-right ammo */
+.hud-ammo {
+  position: absolute;
+  right: 28px;
+  bottom: 22px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+.hud-ammo span {
+  font-size: 15px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+/* Top-center objective */
+.hud-objective {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: rgba(10, 10, 14, 0.45);
+  padding: 6px 18px;
+  border-radius: 4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.hud-objective.done {
+  color: #ffd987;
+}
+
+/* Full-screen overlay panels (click-to-play / death) */
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(8, 8, 14, 0.72);
+  pointer-events: auto;
+  cursor: pointer;
+  text-align: center;
+}
+.hud-overlay.hidden {
+  display: none;
+}
+.hud-overlay h1 {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+.hud-overlay h1.death {
+  color: #e8503a;
+}
+.hud-overlay p {
+  margin: 0;
+  font-size: 16px;
+  opacity: 0.85;
+  line-height: 1.6;
+}
+.hud-overlay .prompt {
+  margin-top: 18px;
+  font-size: 19px;
+  color: #ffd987;
+  animation: hud-pulse 1.6s ease-in-out infinite;
+}
+@keyframes hud-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
