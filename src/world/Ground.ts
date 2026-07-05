@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeRoadDashTexture } from './proceduralTextures';
+import { makeRoadDashTexture, makeCobblestoneTexture, makeCrosswalkTexture } from './proceduralTextures';
 
 export interface BuiltGround {
   group: THREE.Group;
@@ -79,10 +79,32 @@ export function buildGround(): BuiltGround {
   addSidewalk(10, -46.5, 4, 73);
   addSidewalk(10, 46.5, 4, 73);
 
-  // Tower plaza: broad light stone esplanade at the west end.
+  // Pedestrian crosswalks at the boulevard / cross-street intersection.
+  const zebraTex = makeCrosswalkTexture();
+  const zebraMat = new THREE.MeshBasicMaterial({ map: zebraTex, transparent: true, depthWrite: false });
+  const addCrosswalk = (cx: number, cz: number, rotY: number) => {
+    const tex = zebraTex.clone();
+    tex.repeat.set(1, 11);
+    const m = zebraMat.clone();
+    m.map = tex;
+    const zebra = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 15.4), m);
+    zebra.rotation.order = 'YXZ';
+    zebra.rotation.y = rotY;
+    zebra.rotation.x = -Math.PI / 2;
+    zebra.position.set(cx, 0.06, cz);
+    group.add(zebra);
+  };
+  addCrosswalk(-10.5, 0, 0); // across the boulevard, west side of the junction
+  addCrosswalk(10.5, 0, 0); // east side
+  addCrosswalk(0, -10.5, Math.PI / 2); // across the cross street, north side
+  addCrosswalk(0, 10.5, Math.PI / 2); // south side
+
+  // Tower plaza: broad esplanade of granite setts at the west end.
+  const cobbleTex = makeCobblestoneTexture();
+  cobbleTex.repeat.set(34, 42);
   const plaza = new THREE.Mesh(
     new THREE.BoxGeometry(90, 0.1, 110),
-    new THREE.MeshStandardMaterial({ color: 0x8a8178, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ map: cobbleTex, roughness: 1 }),
   );
   plaza.position.set(-152, 0.05, 0);
   group.add(plaza);

@@ -61,16 +61,15 @@ export class PlayerController {
     this.applyLook();
 
     // --- Horizontal movement (yaw only, ignore pitch) ---
-    let mx = 0;
-    let mz = 0;
-    if (this.input.isDown('KeyW')) mz -= 1;
-    if (this.input.isDown('KeyS')) mz += 1;
-    if (this.input.isDown('KeyA')) mx -= 1;
-    if (this.input.isDown('KeyD')) mx += 1;
-    if (mx !== 0 || mz !== 0) {
-      const len = Math.hypot(mx, mz);
-      mx /= len;
-      mz /= len;
+    let { x: mx, z: mz } = this.input.getMoveAxes();
+    const len = Math.hypot(mx, mz);
+    if (len > 0.001) {
+      // Digital WASD diagonals exceed length 1 and get clamped; the touch
+      // joystick's analog magnitude (<=1) is preserved for partial-speed walking.
+      if (len > 1) {
+        mx /= len;
+        mz /= len;
+      }
       const sin = Math.sin(this.yaw);
       const cos = Math.cos(this.yaw);
       // Rotate local (mx, mz) by yaw: local -Z is camera forward.

@@ -20,6 +20,11 @@ export interface StreetlightSpec {
   z: number;
 }
 
+export interface TreeSpec {
+  x: number;
+  z: number;
+}
+
 export interface EnemySpec {
   x: number;
   z: number;
@@ -78,6 +83,49 @@ export const STREETLIGHTS: StreetlightSpec[] = [
   { x: -10, z: 35 },
   { x: 10, z: 60 },
 ];
+
+// Pollarded plane trees lining the boulevard sidewalks (kept near the curb at
+// |z| ~= 10.4, offset from the streetlights so they never overlap). Trunks are
+// slim collision footprints; canopies overhang freely.
+export const TREES: TreeSpec[] = [
+  // North sidewalk (z = -10.4)
+  { x: 70, z: -10.4 },
+  { x: 52, z: -10.4 },
+  { x: 30, z: -10.4 },
+  { x: 16, z: -10.4 },
+  { x: -14, z: -10.4 },
+  { x: -32, z: -10.4 },
+  { x: -50, z: -10.4 },
+  { x: -72, z: -10.4 },
+  { x: -86, z: -10.4 },
+  // South sidewalk (z = +10.4)
+  { x: 84, z: 10.4 },
+  { x: 70, z: 10.4 },
+  { x: 46, z: 10.4 },
+  { x: 32, z: 10.4 },
+  { x: -16, z: 10.4 },
+  { x: -28, z: 10.4 },
+  { x: -52, z: 10.4 },
+  { x: -66, z: 10.4 },
+  { x: -88, z: 10.4 },
+  // Cross-street accents
+  { x: 10.5, z: -30 },
+  { x: -10.5, z: 26 },
+  { x: 10.5, z: 44 },
+  // Framing the tower plaza approach
+  { x: -112, z: 26 },
+  { x: -112, z: -26 },
+];
+
+// Wallace fountains: one at the boulevard/cross-street corner, one greeting
+// visitors at the east edge of the tower plaza.
+export const WALLACE_FOUNTAINS: TreeSpec[] = [
+  { x: 14, z: 10 },
+  { x: -112, z: -8 },
+];
+
+// Guimard Métro entrance on the plaza, opening toward the boulevard.
+export const METRO_ENTRANCE = { x: -111, z: -20 };
 
 export const ENEMIES: EnemySpec[] = [
   // Boulevard

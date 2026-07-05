@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeSkyTexture } from '../world/proceduralTextures';
+import { IS_TOUCH_DEVICE } from '../utils/device';
 
 /**
  * Renderer, scene, camera, and the evening-Paris mood: dusk gradient sky,
@@ -12,7 +13,9 @@ export class SceneSetup {
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Weaker mobile GPUs benefit more from a lower resolution than from AA headroom.
+    const maxPixelRatio = IS_TOUCH_DEVICE ? 1.5 : 2;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;

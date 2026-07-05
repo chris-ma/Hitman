@@ -1,9 +1,12 @@
 import * as THREE from 'three';
-import { BUILDINGS, STREETLIGHTS } from './cityData';
+import { BUILDINGS, STREETLIGHTS, TREES, WALLACE_FOUNTAINS, METRO_ENTRANCE } from './cityData';
 import { buildBuilding } from './Building';
 import { buildGround } from './Ground';
 import { buildStreetlight } from './Streetlight';
 import { buildEiffelTower } from './EiffelTower';
+import { buildTrees } from './Tree';
+import { buildWallaceFountain } from './WallaceFountain';
+import { buildMetroEntrance } from './MetroEntrance';
 import type { AABB } from '../utils/collision';
 import { SPAWN_POSITION } from '../constants';
 
@@ -47,5 +50,23 @@ export class World {
     const tower = buildEiffelTower(TOWER_POSITION.x, TOWER_POSITION.z);
     scene.add(tower.group);
     this.collidables.push(...tower.footprints);
+
+    // Boulevard plane trees (2 draw calls total via instancing). Only the
+    // slim trunks collide — canopies overhang the sidewalk freely.
+    const trees = buildTrees(TREES);
+    scene.add(trees.group);
+    this.collidables.push(...trees.footprints);
+
+    // Wallace fountains at a boulevard corner and on the plaza edge.
+    for (const spot of WALLACE_FOUNTAINS) {
+      const fountain = buildWallaceFountain(spot.x, spot.z);
+      scene.add(fountain.group);
+      this.collidables.push(fountain.footprint);
+    }
+
+    // Guimard Métro entrance on the plaza.
+    const metro = buildMetroEntrance(METRO_ENTRANCE.x, METRO_ENTRANCE.z);
+    scene.add(metro.group);
+    this.collidables.push(metro.footprint);
   }
 }

@@ -15,9 +15,20 @@ export function buildStreetlight(x: number, z: number, withLight: boolean): THRE
   const group = new THREE.Group();
   group.position.set(x, 0, z);
 
+  // Fluted cast-iron base plinth.
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.26, 0.55, 8), poleMat);
+  plinth.position.y = 0.275;
+  group.add(plinth);
+
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.11, 4.4, 8), poleMat);
   pole.position.y = 2.2;
   group.add(pole);
+
+  // Decorative mid-pole ring.
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.03, 6, 10), poleMat);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 1.1;
+  group.add(ring);
 
   const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 8), poleMat);
   collar.position.y = 4.35;

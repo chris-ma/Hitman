@@ -4,15 +4,65 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
   background: #101018;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 #app {
   position: relative;
   width: 100vw;
   height: 100vh;
+  touch-action: none;
 }
 
 #app canvas {
   display: block;
+}
+
+#rotate-prompt {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #101018;
+  color: #f2ede2;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  text-align: center;
+  padding: 0 32px;
+}
+#rotate-prompt .rotate-icon {
+  font-size: 48px;
+  animation: rotate-hint 1.8s ease-in-out infinite;
+}
+#rotate-prompt p {
+  margin: 0;
+  font-size: 16px;
+  opacity: 0.85;
+}
+@keyframes rotate-hint {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-90deg);
+  }
+}
+
+/* Coarse-pointer (touch) devices in portrait: block play and ask for landscape. */
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-prompt {
+    display: flex;
+  }
+  #app {
+    display: none;
+  }
 }

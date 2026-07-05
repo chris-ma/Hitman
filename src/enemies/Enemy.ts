@@ -62,16 +62,45 @@ export class Enemy {
     this.group.add(head);
     this.hittables.push(head);
 
-    const shirt = new THREE.Mesh(
-      new THREE.BoxGeometry(0.2, 0.4, 0.04),
-      new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.9 }),
-    );
+    const shirtMat = new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.9 });
+    const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 0.04), shirtMat);
     shirt.position.set(0, 1.22, 0.295);
     this.group.add(shirt);
+    this.materials.push(shirtMat);
 
     const tie = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.34, 0.03), tieMat);
     tie.position.set(0, 1.22, 0.325);
     this.group.add(tie);
+
+    // --- Cosmetic detail (not raycast targets, no gameplay effect) ---
+
+    // Short dark hair: a cap over the top of the head sphere.
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0x2b2118, roughness: 0.95 });
+    const hair = new THREE.Mesh(
+      new THREE.SphereGeometry(0.215, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      hairMat,
+    );
+    hair.position.y = 1.815;
+    this.group.add(hair);
+    this.materials.push(hairMat);
+
+    // Suit arms hanging at the sides.
+    for (const s of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.52, 3, 7), bodyMat);
+      arm.position.set(s * 0.4, 1.1, 0);
+      arm.rotation.z = s * -0.14;
+      this.group.add(arm);
+    }
+
+    // Armed guards visibly carry a pistol at the right hip.
+    if (spec.shoots) {
+      const gunMat = new THREE.MeshStandardMaterial({ color: 0x1c1e23, roughness: 0.4, metalness: 0.6 });
+      const gun = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.26), gunMat);
+      gun.position.set(0.42, 0.82, 0.2);
+      gun.rotation.x = -0.15;
+      this.group.add(gun);
+      this.materials.push(gunMat);
+    }
 
     for (const m of this.hittables) m.userData.enemy = this;
   }

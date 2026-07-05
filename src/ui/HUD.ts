@@ -1,5 +1,6 @@
 import './hud.css';
 import { PLAYER_MAX_HEALTH } from '../constants';
+import { IS_TOUCH_DEVICE } from '../utils/device';
 
 export type OverlayMode = 'start' | 'paused' | 'dead' | 'none';
 
@@ -112,19 +113,23 @@ export class HUD {
     }
     this.overlay.classList.remove('hidden');
     this.overlayTitle.classList.toggle('death', mode === 'dead');
+    const tapWord = IS_TOUCH_DEVICE ? 'Tap' : 'Click';
     if (mode === 'start') {
       this.overlayTitle.textContent = 'Paris Contract';
-      this.overlayBody.innerHTML =
-        'Eliminate all hostiles in the district.<br>WASD to move &middot; mouse to aim &middot; click to fire &middot; Space to jump &middot; Esc to pause';
-      this.overlayPrompt.textContent = 'Click to play';
+      this.overlayBody.innerHTML = IS_TOUCH_DEVICE
+        ? 'Eliminate all hostiles in the district.<br>Left stick to move &middot; drag right side to aim &middot; FIRE to shoot &middot; JUMP to jump'
+        : 'Eliminate all hostiles in the district.<br>WASD to move &middot; mouse to aim &middot; click to fire &middot; Space to jump &middot; Esc to pause';
+      this.overlayPrompt.textContent = `${tapWord} to play`;
     } else if (mode === 'paused') {
       this.overlayTitle.textContent = 'Paused';
-      this.overlayBody.innerHTML = 'Pointer released.<br>(If the click does nothing, wait a second and click again.)';
-      this.overlayPrompt.textContent = 'Click to resume';
+      this.overlayBody.innerHTML = IS_TOUCH_DEVICE
+        ? 'Controls released.'
+        : 'Pointer released.<br>(If the click does nothing, wait a second and click again.)';
+      this.overlayPrompt.textContent = `${tapWord} to resume`;
     } else {
       this.overlayTitle.textContent = 'You Died';
       this.overlayBody.textContent = 'The contract remains open.';
-      this.overlayPrompt.textContent = 'Click to respawn';
+      this.overlayPrompt.textContent = `${tapWord} to respawn`;
     }
   }
 }

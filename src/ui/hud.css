@@ -153,6 +153,7 @@
 .hud-overlay {
   position: absolute;
   inset: 0;
+  z-index: 20;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -162,6 +163,7 @@
   pointer-events: auto;
   cursor: pointer;
   text-align: center;
+  padding: 0 24px;
 }
 .hud-overlay.hidden {
   display: none;

@@ -11,6 +11,10 @@ export const GROUND_SNAP_TOLERANCE = 0.3; // how far above ground we still snap 
 export const MOUSE_SENSITIVITY = 0.0022;
 export const MAX_PITCH = Math.PI / 2 - 0.02; // ~±89°
 
+// Touch controls
+export const TOUCH_LOOK_MULTIPLIER = 1.7; // relative to MOUSE_SENSITIVITY, drag feels slower than a mouse flick
+export const TOUCH_JOYSTICK_RADIUS = 55; // px the knob can travel from center before clamping
+
 // Weapon
 export const AMMO_MAX = 150;
 export const FIRE_COOLDOWN = 0.14; // seconds between shots (held fire)
