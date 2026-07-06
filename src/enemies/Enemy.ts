@@ -42,6 +42,15 @@ export class Enemy {
   private headWorld = new THREE.Vector3();
   private losRay = new THREE.Raycaster();
   private tmp = new THREE.Vector3();
+  // Walk-cycle state. walkPhase only advances while actually patrolling, so a
+  // phase of 0 (or any frozen value) evaluates to a coherent standing pose.
+  private walkPhase = 0;
+  private idleT = Math.random() * 100; // desync idle sway between guards
+  private readonly upperBody = new THREE.Group();
+  private readonly legGroupL: THREE.Group;
+  private readonly legGroupR: THREE.Group;
+  private readonly armGroupL: THREE.Group;
+  private readonly armGroupR: THREE.Group;
 
   constructor(private spec: EnemySpec) {
     this.group.position.set(spec.x, 0, spec.z);
@@ -52,25 +61,47 @@ export class Enemy {
     const tieMat = new THREE.MeshStandardMaterial({ color: 0xb02030, roughness: 0.8 });
     this.materials = [bodyMat, headMat, tieMat];
 
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.9, 4, 10), bodyMat);
-    body.position.y = 0.82; // spans ~0.05 .. 1.59
-    this.group.add(body);
-    this.hittables.push(body);
+    // Everything above the hips lives in upperBody so the walk bob can move
+    // it as one unit without lifting the legs off the ground. The leg pivot
+    // groups stay direct children of `group` and swing from the hips.
+    this.group.add(this.upperBody);
+
+    // Torso: same radius and same top (~1.59) as the old full-height capsule,
+    // but stopping at the hips (~0.78) so the legs can articulate below it.
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.17, 4, 10), bodyMat);
+    torso.position.y = 1.185; // spans ~0.78 .. 1.59
+    this.upperBody.add(torso);
+    this.hittables.push(torso);
+
+    // Legs: hip-pivot groups at y=0.78; the mesh hangs below the pivot so
+    // rotating the group swings the leg like a pendulum.
+    const makeLeg = (s: number): THREE.Group => {
+      const hip = new THREE.Group();
+      hip.position.set(s * 0.11, 0.78, 0);
+      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.49, 3, 7), bodyMat);
+      leg.position.y = -0.375; // spans ~0.03 .. 0.78 below the hip pivot
+      hip.add(leg);
+      this.group.add(hip);
+      this.hittables.push(leg);
+      return hip;
+    };
+    this.legGroupL = makeLeg(-1);
+    this.legGroupR = makeLeg(1);
 
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), headMat);
     head.position.y = 1.8;
-    this.group.add(head);
+    this.upperBody.add(head);
     this.hittables.push(head);
 
     const shirtMat = new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.9 });
     const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 0.04), shirtMat);
     shirt.position.set(0, 1.22, 0.295);
-    this.group.add(shirt);
+    this.upperBody.add(shirt);
     this.materials.push(shirtMat);
 
     const tie = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.34, 0.03), tieMat);
     tie.position.set(0, 1.22, 0.325);
-    this.group.add(tie);
+    this.upperBody.add(tie);
 
     // --- Cosmetic detail (not raycast targets, no gameplay effect) ---
 
@@ -81,16 +112,24 @@ export class Enemy {
       hairMat,
     );
     hair.position.y = 1.815;
-    this.group.add(hair);
+    this.upperBody.add(hair);
     this.materials.push(hairMat);
 
-    // Suit arms hanging at the sides.
-    for (const s of [-1, 1]) {
+    // Suit arms hanging at the sides, each in a shoulder-pivot group so the
+    // walk cycle can swing them. The static outward tilt lives on the group;
+    // the mesh offset keeps the arm's rest position identical to before.
+    const makeArm = (s: number): THREE.Group => {
+      const shoulder = new THREE.Group();
+      shoulder.position.set(s * 0.4, 1.445, 0);
+      shoulder.rotation.z = s * -0.14;
       const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.52, 3, 7), bodyMat);
-      arm.position.set(s * 0.4, 1.1, 0);
-      arm.rotation.z = s * -0.14;
-      this.group.add(arm);
-    }
+      arm.position.y = -0.345;
+      shoulder.add(arm);
+      this.upperBody.add(shoulder);
+      return shoulder;
+    };
+    this.armGroupL = makeArm(-1);
+    this.armGroupR = makeArm(1);
 
     // Armed guards visibly carry a pistol at the right hip.
     if (spec.shoots) {
@@ -98,7 +137,7 @@ export class Enemy {
       const gun = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.26), gunMat);
       gun.position.set(0.42, 0.82, 0.2);
       gun.rotation.x = -0.15;
-      this.group.add(gun);
+      this.upperBody.add(gun);
       this.materials.push(gunMat);
     }
 
@@ -156,6 +195,11 @@ export class Enemy {
       const b = this.spec.patrolTo;
       const dist = Math.hypot(b.x - a.x, b.z - a.z);
       if (dist > 0.01) {
+        // Unsigned on purpose: the atan2 below keeps the model facing its
+        // direction of travel, so in local space it always walks forward.
+        // Signing this by patrolDir would moonwalk the legs after turns.
+        const STRIDE_LENGTH = 1.3;
+        this.walkPhase += (PATROL_SPEED * dt * Math.PI * 2) / STRIDE_LENGTH;
         this.patrolT += (this.patrolDir * (PATROL_SPEED * dt)) / dist;
         if (this.patrolT >= 1) {
           this.patrolT = 1;
@@ -172,6 +216,26 @@ export class Enemy {
         );
         this.group.position.set(px, 0, pz);
       }
+    }
+
+    // Walk cycle: recomputed fresh each frame as a pure function of walkPhase
+    // (no incremental drift). When walkPhase isn't advancing this settles into
+    // a neutral stand — no special-casing for stationary enemies needed.
+    // Contralateral gait: each leg pairs with the opposite arm.
+    const LEG_SWING = 0.5;
+    const ARM_SWING = 0.35;
+    const BOB = 0.03;
+    this.legGroupL.rotation.x = LEG_SWING * Math.sin(this.walkPhase);
+    this.legGroupR.rotation.x = LEG_SWING * Math.sin(this.walkPhase + Math.PI);
+    this.armGroupR.rotation.x = ARM_SWING * Math.sin(this.walkPhase);
+    this.armGroupL.rotation.x = ARM_SWING * Math.sin(this.walkPhase + Math.PI);
+    // A walker's centre of mass dips twice per stride.
+    this.upperBody.position.y = BOB * Math.abs(Math.sin(this.walkPhase));
+
+    // Stationary guards get a barely-there sway so they read as alive.
+    this.idleT += dt;
+    if (!this.spec.patrolTo) {
+      this.upperBody.rotation.z = 0.015 * Math.sin(this.idleT * 0.7);
     }
 
     // Return fire.

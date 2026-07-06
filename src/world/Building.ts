@@ -35,8 +35,8 @@ function plainWall(colorHex: string): THREE.MeshStandardMaterial {
 }
 
 // Shared across every building — never instantiated per building.
-const roofMat = new THREE.MeshStandardMaterial({ color: ROOF_COLOR, roughness: 0.6, metalness: 0.35, envMapIntensity: 0.35 });
-const paneMat = new THREE.MeshStandardMaterial({ color: 0x232b36, roughness: 0.35, metalness: 0.15, envMapIntensity: 1.1 });
+const roofMat = new THREE.MeshStandardMaterial({ color: ROOF_COLOR, roughness: 0.78, metalness: 0.35, envMapIntensity: 0.35 });
+const paneMat = new THREE.MeshStandardMaterial({ color: 0x232b36, roughness: 0.4, metalness: 0.15, envMapIntensity: 0.6 });
 const potMat = new THREE.MeshStandardMaterial({ color: 0xc07a55, roughness: 0.85 });
 const brickMat = plainWall('#b3684f');
 
@@ -45,11 +45,11 @@ const brickMat = plainWall('#b3684f');
 // force an extra background render pass per transmissive object.
 const glassMat = new THREE.MeshStandardMaterial({
   color: 0x7e95a8, // faint blue tint
-  roughness: 0.16,
+  roughness: 0.3,
   metalness: 0.15,
   transparent: true,
   opacity: 0.45,
-  envMapIntensity: 1.0,
+  envMapIntensity: 0.55,
 });
 
 let railingMatSingleton: THREE.MeshStandardMaterial | null = null;
@@ -60,9 +60,9 @@ function railingMat(): THREE.MeshStandardMaterial {
       transparent: true,
       alphaTest: 0.35,
       side: THREE.DoubleSide,
-      roughness: 0.55,
-      metalness: 0.45,
-      envMapIntensity: 1.3,
+      roughness: 0.8,
+      metalness: 0.4,
+      envMapIntensity: 0.6,
     });
   }
   return railingMatSingleton;

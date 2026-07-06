@@ -101,6 +101,24 @@ export function makeFacadeTextures(
   const [eCanvas, eCtx] = makeCanvas(W, H);
   const [bCanvas, bCtx] = makeCanvas(W, H);
   const rng = makeRng(seed);
+  // Weathering uses its own RNG stream so adding/removing grime never
+  // perturbs the deterministic lit-window pattern drawn from `rng`.
+  const grimeRng = makeRng(seed * 7919 + 4211);
+
+  /** Tapered, semi-transparent rain-runoff streak running down from (x, yTop). */
+  const drawStreak = (x: number, yTop: number, len: number, topW: number): void => {
+    const alpha = 0.1 + grimeRng() * 0.1;
+    const drift = (grimeRng() - 0.5) * 3; // slight lean so streaks aren't ruler-straight
+    const bottomW = topW * (0.25 + grimeRng() * 0.2);
+    ctx.fillStyle = `rgba(40,36,30,${alpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(x - topW / 2, yTop);
+    ctx.lineTo(x + topW / 2, yTop);
+    ctx.lineTo(x + drift + bottomW / 2, yTop + len);
+    ctx.lineTo(x + drift - bottomW / 2, yTop + len);
+    ctx.closePath();
+    ctx.fill();
+  };
 
   // Stone base.
   ctx.fillStyle = baseColor;
@@ -171,6 +189,16 @@ export function makeFacadeTextures(
       ctx.fillRect(wx - ww * 0.12, wy + wh, ww * 1.24, 3.5);
       ctx.fillStyle = 'rgba(0,0,0,0.18)';
       ctx.fillRect(wx - ww * 0.12, wy + wh + 3.5, ww * 1.24, 1.5);
+
+      // Rain-runoff grime streaking down the stone from under the sill.
+      if (grimeRng() < 0.4) {
+        const streaks = 2 + (grimeRng() < 0.5 ? 1 : 0);
+        for (let i = 0; i < streaks; i++) {
+          const sxr = wx + ww * (0.1 + grimeRng() * 0.8);
+          const len = rowH * (1.5 + grimeRng() * 1.5);
+          drawStreak(sxr, wy + wh + 5, len, 2 + grimeRng() * 4);
+        }
+      }
 
       // Moulded lintel ledge above the window.
       ctx.fillStyle = 'rgba(255,252,240,0.55)';
@@ -257,6 +285,18 @@ export function makeFacadeTextures(
     // String-course shadow under the balcony slab.
     ctx.fillStyle = 'rgba(0,0,0,0.16)';
     ctx.fillRect(0, yBottom + 4, W, 3);
+
+    // Occasional broad runoff stains bleeding down from the balcony slab.
+    for (let x = W * 0.05; x < W; x += W / 7) {
+      if (grimeRng() < 0.25) {
+        drawStreak(
+          x + grimeRng() * 24,
+          yBottom + 7,
+          rowH * (1.2 + grimeRng() * 1.4),
+          6 + grimeRng() * 8,
+        );
+      }
+    }
   }
 
   // Ground-floor band: darker stone with tall shop openings and sign boards.
@@ -310,6 +350,15 @@ export function makeFacadeTextures(
       eCtx.fillRect(sx, oy, sw, oh);
     }
   }
+
+  // Street-level grime: the bottom of every urban facade collects traffic
+  // film and splash-back. Drawn last so it darkens shopfronts and stone alike.
+  const dirtTop = H * 0.72;
+  const dirt = ctx.createLinearGradient(0, dirtTop, 0, H);
+  dirt.addColorStop(0, 'rgba(15,12,10,0)');
+  dirt.addColorStop(1, 'rgba(15,12,10,0.25)');
+  ctx.fillStyle = dirt;
+  ctx.fillRect(0, dirtTop, W, H - dirtTop);
 
   return { map: toTexture(canvas), emissiveMap: toTexture(eCanvas), bumpMap: toBumpTexture(bCanvas) };
 }
@@ -413,6 +462,30 @@ export function makeCobblestoneTextures(): CobblestoneTextures {
       bCtx.roundRect(px, py, cellW - 3, cellH - 3, 4);
       bCtx.fill();
     }
+  }
+  // Grime: soft dark oil/dirt blotches plus a few lighter foot-worn patches.
+  // Deliberately matte (no bright gradient centers — dry grime, not puddles)
+  // and inset from the tile edges so the texture keeps tiling seamlessly.
+  const blotches = 12 + Math.floor(rng() * 5);
+  for (let i = 0; i < blotches; i++) {
+    const radius = 8 + rng() * 12;
+    const cx = radius + rng() * (S - radius * 2);
+    const cy = radius + rng() * (S - radius * 2);
+    const g = ctx.createRadialGradient(cx, cy, radius * 0.15, cx, cy, radius);
+    g.addColorStop(0, 'rgba(20,18,14,0.15)');
+    g.addColorStop(1, 'rgba(20,18,14,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+  }
+  for (let i = 0; i < 5; i++) {
+    const radius = 10 + rng() * 12;
+    const cx = radius + rng() * (S - radius * 2);
+    const cy = radius + rng() * (S - radius * 2);
+    const g = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius);
+    g.addColorStop(0, 'rgba(200,195,180,0.08)');
+    g.addColorStop(1, 'rgba(200,195,180,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
   }
   const map = toTexture(canvas);
   map.wrapS = THREE.RepeatWrapping;

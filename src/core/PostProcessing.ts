@@ -55,8 +55,8 @@ export class PostProcessing {
     // the tower beacon and muzzle flashes — not the warm sky.
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(w * pr * HEAVY_PASS_SCALE, h * pr * HEAVY_PASS_SCALE),
-      0.32, // strength
-      0.4, // radius
+      0.24, // strength
+      0.3, // radius
       0.85, // threshold
     );
     this.composer.addPass(this.bloomPass);

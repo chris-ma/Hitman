@@ -8,7 +8,7 @@ export interface BuiltMetro {
   footprint: AABB;
 }
 
-const guimardGreen = new THREE.MeshStandardMaterial({ color: 0x2c4636, roughness: 0.5, metalness: 0.45, envMapIntensity: 1.4 });
+const guimardGreen = new THREE.MeshStandardMaterial({ color: 0x2c4636, roughness: 0.8, metalness: 0.4, envMapIntensity: 0.6 });
 const lampMat = new THREE.MeshStandardMaterial({
   color: 0xffb36b,
   emissive: 0xff8c3a,

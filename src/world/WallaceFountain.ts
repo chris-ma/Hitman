@@ -8,7 +8,7 @@ export interface BuiltFountain {
 }
 
 // The classic Wallace dark green, shared across all instances.
-const wallaceGreen = new THREE.MeshStandardMaterial({ color: 0x1e3b2a, roughness: 0.45, metalness: 0.4, envMapIntensity: 1.4 });
+const wallaceGreen = new THREE.MeshStandardMaterial({ color: 0x1e3b2a, roughness: 0.8, metalness: 0.4, envMapIntensity: 0.6 });
 const waterMat = new THREE.MeshStandardMaterial({ color: 0x2b4a52, roughness: 0.15, metalness: 0.1, envMapIntensity: 1.2 });
 
 let ironGeoCache: THREE.BufferGeometry | null = null;

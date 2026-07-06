@@ -11,11 +11,11 @@ export const FilmGradeShader = {
   uniforms: {
     tDiffuse: { value: null },
     time: { value: 0 },
-    grainAmount: { value: 0.05 },
+    grainAmount: { value: 0.09 },
     vignetteAmount: { value: 0.24 },
     aberrationAmount: { value: 0.0018 },
-    contrast: { value: 1.03 },
-    saturation: { value: 1.07 },
+    contrast: { value: 1.08 },
+    saturation: { value: 0.94 },
   },
 
   vertexShader: /* glsl */ `
