@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-const poleMat = new THREE.MeshStandardMaterial({ color: 0x1f2a24, roughness: 0.6, metalness: 0.4 });
+const poleMat = new THREE.MeshStandardMaterial({ color: 0x1f2a24, roughness: 0.6, metalness: 0.4, envMapIntensity: 1.4 });
 const lampMat = new THREE.MeshStandardMaterial({
   color: 0xffe0a8,
   emissive: 0xffc078,

@@ -7,7 +7,7 @@ export interface BuiltTower {
   footprints: AABB[];
 }
 
-const IRON = new THREE.MeshStandardMaterial({ color: 0x4d4038, roughness: 0.65, metalness: 0.5 });
+const IRON = new THREE.MeshStandardMaterial({ color: 0x4d4038, roughness: 0.65, metalness: 0.5, envMapIntensity: 1.4 });
 
 /** Cylinder strut from a to b. */
 function strut(a: THREE.Vector3, b: THREE.Vector3, r: number): THREE.Mesh {

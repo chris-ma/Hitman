@@ -30,9 +30,53 @@ function toTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
   return tex;
 }
 
+/** Bump/height data is not color — no sRGB decode. */
+function toBumpTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/** rgb(g,g,g) helper for grayscale bump painting. */
+function gray(g: number): string {
+  const v = Math.max(0, Math.min(255, Math.round(g)));
+  return `rgb(${v},${v},${v})`;
+}
+
+// ---------------------------------------------------------------------------
+// Shared layout constants. Building.ts rebuilds the facade window grid in 3D
+// (real glass panes) from these same fractions, so the painted texture and
+// the glass geometry can never drift out of alignment.
+// ---------------------------------------------------------------------------
+
+/** Fraction of the facade texture height taken by the ground shopfront band. */
+export const FACADE_GROUND_BAND_FRAC = 0.16;
+/** Window left inset within its grid cell (fraction of cell width). */
+export const WINDOW_X_FRAC = 0.26;
+/** Window width (fraction of cell width). */
+export const WINDOW_W_FRAC = 0.48;
+/** Window top inset within its grid row (fraction of row height). */
+export const WINDOW_Y_FRAC = 0.2;
+/** Window height (fraction of row height). */
+export const WINDOW_H_FRAC = 0.62;
+
+/**
+ * The four dusk gradient stops shared by the sky texture and the PMREM
+ * environment (see world/Environment.ts): zenith → high sky → horizon glow →
+ * horizon. Keeping them in one place stops reflections drifting from the sky.
+ */
+export const SKY_GRADIENT_STOPS: ReadonlyArray<readonly [number, string]> = [
+  [0.0, '#2b3a63'],
+  [0.45, '#6f5d7d'],
+  [0.75, '#cf8a63'],
+  [1.0, '#e8a06b'],
+];
+
 export interface FacadeTextures {
   map: THREE.CanvasTexture;
   emissiveMap: THREE.CanvasTexture;
+  /** Grayscale relief correlated with the albedo: recessed windows, proud sills. */
+  bumpMap: THREE.CanvasTexture;
 }
 
 /**
@@ -55,6 +99,7 @@ export function makeFacadeTextures(
   const H = 512;
   const [canvas, ctx] = makeCanvas(W, H);
   const [eCanvas, eCtx] = makeCanvas(W, H);
+  const [bCanvas, bCtx] = makeCanvas(W, H);
   const rng = makeRng(seed);
 
   // Stone base.
@@ -64,13 +109,18 @@ export function makeFacadeTextures(
   eCtx.fillStyle = '#000000';
   eCtx.fillRect(0, 0, W, H);
 
-  const groundBandH = H * 0.16; // shopfront band at the bottom of the texture
+  // Bump base: mid-grey = wall plane.
+  bCtx.fillStyle = gray(128);
+  bCtx.fillRect(0, 0, W, H);
+
+  const groundBandH = H * FACADE_GROUND_BAND_FRAC; // shopfront band at the bottom
   const upperH = H - groundBandH;
   const rowH = upperH / rows;
   const colW = W / cols;
 
   // Ashlar stone courses with subtle per-block tonal variation, so the wall
-  // doesn't read as a flat fill.
+  // doesn't read as a flat fill. The bump map reuses the same rng draw per
+  // block, so relief variation lands on the same stones as the tint.
   const courseH = 20;
   for (let y = 0; y < H - groundBandH; y += courseH) {
     const stagger = ((y / courseH) % 2) * 34;
@@ -78,10 +128,14 @@ export function makeFacadeTextures(
       const v = rng();
       ctx.fillStyle = v < 0.5 ? `rgba(0,0,0,${(0.02 + v * 0.05).toFixed(3)})` : `rgba(255,255,255,${((v - 0.5) * 0.07).toFixed(3)})`;
       ctx.fillRect(x + stagger, y, 68, courseH);
+      bCtx.fillStyle = gray(122 + v * 14);
+      bCtx.fillRect(x + stagger, y, 68, courseH);
     }
-    // Course joint line.
+    // Course joint line (a recessed groove in the bump map).
     ctx.fillStyle = 'rgba(0,0,0,0.08)';
     ctx.fillRect(0, y, W, 1.5);
+    bCtx.fillStyle = gray(92);
+    bCtx.fillRect(0, y, W, 1.5);
   }
 
   // Corner quoins: alternating long/short dressed blocks down both edges.
@@ -95,6 +149,10 @@ export function makeFacadeTextures(
     ctx.lineWidth = 1;
     ctx.strokeRect(0.5, y + 0.5, w, courseH * 1.5 - 2);
     ctx.strokeRect(W - w - 0.5, y + 0.5, w, courseH * 1.5 - 2);
+    // Quoins sit slightly proud of the wall.
+    bCtx.fillStyle = gray(i % 2 === 0 ? 152 : 140);
+    bCtx.fillRect(0, y, w, courseH * 1.5 - 2);
+    bCtx.fillRect(W - w, y, w, courseH * 1.5 - 2);
   }
 
   // Windows (top of texture = top of wall). French windows: tall and narrow.
@@ -103,10 +161,10 @@ export function makeFacadeTextures(
     const y0 = r * rowH;
     for (let c = 0; c < cols; c++) {
       const x0 = c * colW;
-      const wx = x0 + colW * 0.26;
-      const wy = y0 + rowH * 0.2;
-      const ww = colW * 0.48;
-      const wh = rowH * 0.62;
+      const wx = x0 + colW * WINDOW_X_FRAC;
+      const wy = y0 + rowH * WINDOW_Y_FRAC;
+      const ww = colW * WINDOW_W_FRAC;
+      const wh = rowH * WINDOW_H_FRAC;
 
       // Stone sill under the window.
       ctx.fillStyle = 'rgba(255,252,240,0.5)';
@@ -119,6 +177,13 @@ export function makeFacadeTextures(
       ctx.fillRect(wx - ww * 0.14, wy - 6, ww * 1.28, 4);
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.fillRect(wx - ww * 0.14, wy - 2, ww * 1.28, 1.5);
+
+      // Bump: window reveal recessed into the wall, sill/lintel proud.
+      bCtx.fillStyle = gray(58);
+      bCtx.fillRect(wx - 2, wy - 2, ww + 4, wh + 4);
+      bCtx.fillStyle = gray(176);
+      bCtx.fillRect(wx - ww * 0.12, wy + wh, ww * 1.24, 3.5);
+      bCtx.fillRect(wx - ww * 0.14, wy - 6, ww * 1.28, 4);
 
       // Pediment on the étage noble (row 1): triangular / segmental alternating.
       if (r === 1 && rows >= 4) {
@@ -203,6 +268,11 @@ export function makeFacadeTextures(
   for (let y = gy; y < H; y += 14) ctx.fillRect(0, y, W, 1.5);
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
   ctx.fillRect(0, gy, W, 3);
+  // Bump: rusticated band reads slightly proud with deep joints.
+  bCtx.fillStyle = gray(138);
+  bCtx.fillRect(0, gy, W, groundBandH);
+  bCtx.fillStyle = gray(84);
+  for (let y = gy; y < H; y += 14) bCtx.fillRect(0, y, W, 2);
 
   const shops = Math.max(2, Math.round(cols / 1.5));
   const shopW = W / shops;
@@ -213,9 +283,11 @@ export function makeFacadeTextures(
     const oh = groundBandH * 0.66;
     const lit = rng() < 0.4;
 
-    // Dark shopfront surround.
+    // Dark shopfront surround (recessed vitrine in the bump map).
     ctx.fillStyle = '#3a3229';
     ctx.fillRect(sx - 3, oy - 3, sw + 6, oh + 3);
+    bCtx.fillStyle = gray(52);
+    bCtx.fillRect(sx - 3, oy - 3, sw + 6, oh + 3);
     ctx.fillStyle = lit ? '#e8b866' : '#1e232b';
     ctx.fillRect(sx, oy, sw, oh);
     // Door mullion at one side of the vitrine.
@@ -239,7 +311,7 @@ export function makeFacadeTextures(
     }
   }
 
-  return { map: toTexture(canvas), emissiveMap: toTexture(eCanvas) };
+  return { map: toTexture(canvas), emissiveMap: toTexture(eCanvas), bumpMap: toBumpTexture(bCanvas) };
 }
 
 /**
@@ -303,13 +375,22 @@ export function makeAwningStripeTexture(colorA: string, colorB: string): THREE.C
   return tex;
 }
 
-/** Granite sett / cobblestone pattern for the tower plaza. Tileable. */
-export function makeCobblestoneTexture(): THREE.CanvasTexture {
+export interface CobblestoneTextures {
+  map: THREE.CanvasTexture;
+  bumpMap: THREE.CanvasTexture;
+}
+
+/** Granite sett / cobblestone pattern for the tower plaza. Tileable, with a
+ *  matching bump map (dark joints, lighter raised stone tops). */
+export function makeCobblestoneTextures(): CobblestoneTextures {
   const S = 256;
   const [canvas, ctx] = makeCanvas(S, S);
+  const [bCanvas, bCtx] = makeCanvas(S, S);
   const rng = makeRng(517);
   ctx.fillStyle = '#6f675e'; // joint mortar/shadow color
   ctx.fillRect(0, 0, S, S);
+  bCtx.fillStyle = gray(60); // joints are the low points
+  bCtx.fillRect(0, 0, S, S);
   const rows = 10;
   const cellH = S / rows;
   const cellW = S / 8;
@@ -326,9 +407,43 @@ export function makeCobblestoneTexture(): THREE.CanvasTexture {
       // Light top edge for a hint of relief.
       ctx.fillStyle = 'rgba(255,255,255,0.10)';
       ctx.fillRect(px + 2, py + 1, cellW - 7, 2);
+      // Bump: same stone, same rng tone driving the raised top.
+      bCtx.fillStyle = gray(120 + (tone - 122) * 2);
+      bCtx.beginPath();
+      bCtx.roundRect(px, py, cellW - 3, cellH - 3, 4);
+      bCtx.fill();
     }
   }
-  const tex = toTexture(canvas);
+  const map = toTexture(canvas);
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  const bumpMap = toBumpTexture(bCanvas);
+  bumpMap.wrapS = THREE.RepeatWrapping;
+  bumpMap.wrapT = THREE.RepeatWrapping;
+  return { map, bumpMap };
+}
+
+/**
+ * Standalone tileable asphalt relief: coarse aggregate speckle plus a few
+ * shallow patch seams. The road material has no diffuse map (flat color), and
+ * a bump map works fine on its own.
+ */
+export function makeAsphaltBumpMap(): THREE.CanvasTexture {
+  const S = 128;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rng = makeRng(90210);
+  ctx.fillStyle = gray(128);
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 2600; i++) {
+    const v = rng();
+    ctx.fillStyle = gray(112 + v * 34);
+    ctx.fillRect(Math.floor(rng() * S), Math.floor(rng() * S), 1 + (rng() < 0.3 ? 1 : 0), 1);
+  }
+  // A couple of faint seams (kept horizontal/vertical so the tile stays seamless).
+  ctx.fillStyle = gray(108);
+  ctx.fillRect(0, Math.floor(S * 0.31), S, 1);
+  ctx.fillRect(Math.floor(S * 0.72), 0, 1, S);
+  const tex = toBumpTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   return tex;
@@ -381,10 +496,7 @@ export function makeRoadDashTexture(): THREE.CanvasTexture {
 export function makeSkyTexture(): THREE.CanvasTexture {
   const [canvas, ctx] = makeCanvas(4, 512);
   const g = ctx.createLinearGradient(0, 0, 0, 512);
-  g.addColorStop(0.0, '#2b3a63');
-  g.addColorStop(0.45, '#6f5d7d');
-  g.addColorStop(0.75, '#cf8a63');
-  g.addColorStop(1.0, '#e8a06b');
+  for (const [stop, color] of SKY_GRADIENT_STOPS) g.addColorStop(stop, color);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 4, 512);
   return toTexture(canvas);

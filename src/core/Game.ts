@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SceneSetup } from './SceneSetup';
+import { PostProcessing } from './PostProcessing';
 import type { GameState } from './GameState';
 import { InputManager } from '../input/InputManager';
 import { TouchControls } from '../input/TouchControls';
@@ -21,6 +22,7 @@ import { HUD } from '../ui/HUD';
 export class Game {
   private state: GameState = 'menu';
   private setup: SceneSetup;
+  private postProcessing: PostProcessing;
   private input: InputManager;
   private world: World;
   private player: Player;
@@ -35,6 +37,7 @@ export class Game {
   constructor(container: HTMLElement) {
     this.setup = new SceneSetup(container);
     const { scene, camera, renderer } = this.setup;
+    this.postProcessing = new PostProcessing(renderer, scene, camera);
 
     this.input = new InputManager(renderer.domElement);
     this.world = new World(scene);
@@ -111,6 +114,9 @@ export class Game {
     this.hud.setAmmo(this.weapon.ammo);
     this.hud.setObjective(this.enemies.kills, this.enemies.total);
 
-    this.setup.renderer.render(this.setup.scene, this.setup.camera);
+    // Sun-follow runs in every state so the background stays correctly lit
+    // and shadowed even behind the pause/death overlays.
+    this.setup.updateSunFollow(this.setup.camera.position);
+    this.postProcessing.render(dt);
   }
 }

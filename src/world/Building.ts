@@ -7,6 +7,11 @@ import {
   makeIronRailingTexture,
   makeAwningStripeTexture,
   makeRng,
+  FACADE_GROUND_BAND_FRAC,
+  WINDOW_X_FRAC,
+  WINDOW_W_FRAC,
+  WINDOW_Y_FRAC,
+  WINDOW_H_FRAC,
 } from './proceduralTextures';
 
 export interface BuiltBuilding {
@@ -23,17 +28,29 @@ const plainWallCache = new Map<string, THREE.MeshStandardMaterial>();
 function plainWall(colorHex: string): THREE.MeshStandardMaterial {
   let m = plainWallCache.get(colorHex);
   if (!m) {
-    m = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.95 });
+    m = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.95, envMapIntensity: 0.15 });
     plainWallCache.set(colorHex, m);
   }
   return m;
 }
 
 // Shared across every building — never instantiated per building.
-const roofMat = new THREE.MeshStandardMaterial({ color: ROOF_COLOR, roughness: 0.6, metalness: 0.35 });
-const paneMat = new THREE.MeshStandardMaterial({ color: 0x232b36, roughness: 0.35, metalness: 0.15 });
+const roofMat = new THREE.MeshStandardMaterial({ color: ROOF_COLOR, roughness: 0.6, metalness: 0.35, envMapIntensity: 0.35 });
+const paneMat = new THREE.MeshStandardMaterial({ color: 0x232b36, roughness: 0.35, metalness: 0.15, envMapIntensity: 1.1 });
 const potMat = new THREE.MeshStandardMaterial({ color: 0xc07a55, roughness: 0.85 });
 const brickMat = plainWall('#b3684f');
+
+// Real glass panes, one merged mesh per building (shared singleton material).
+// MeshStandardMaterial on purpose: MeshPhysicalMaterial transmission would
+// force an extra background render pass per transmissive object.
+const glassMat = new THREE.MeshStandardMaterial({
+  color: 0x7e95a8, // faint blue tint
+  roughness: 0.16,
+  metalness: 0.15,
+  transparent: true,
+  opacity: 0.45,
+  envMapIntensity: 1.0,
+});
 
 let railingMatSingleton: THREE.MeshStandardMaterial | null = null;
 function railingMat(): THREE.MeshStandardMaterial {
@@ -45,6 +62,7 @@ function railingMat(): THREE.MeshStandardMaterial {
       side: THREE.DoubleSide,
       roughness: 0.55,
       metalness: 0.45,
+      envMapIntensity: 1.3,
     });
   }
   return railingMatSingleton;
@@ -72,13 +90,16 @@ function awningMat(scheme: number): THREE.MeshStandardMaterial {
 }
 
 function facadeMaterial(cols: number, rows: number, color: string, seed: number, litRatio: number): THREE.MeshStandardMaterial {
-  const { map, emissiveMap } = makeFacadeTextures(cols, rows, color, seed, litRatio);
+  const { map, emissiveMap, bumpMap } = makeFacadeTextures(cols, rows, color, seed, litRatio);
   return new THREE.MeshStandardMaterial({
     map,
     emissive: new THREE.Color(0xffb060),
     emissiveMap,
     emissiveIntensity: 0.9,
     roughness: 0.9,
+    bumpMap,
+    bumpScale: 0.035,
+    envMapIntensity: 0.18,
   });
 }
 
@@ -176,9 +197,10 @@ export function buildBuilding(spec: BuildingSpec): BuiltBuilding {
   const dormerGeos: THREE.BufferGeometry[] = [];
   const dormerCapGeos: THREE.BufferGeometry[] = [];
   const paneGeos: THREE.BufferGeometry[] = [];
+  const glassGeos: THREE.BufferGeometry[] = [];
 
   // --- Real 3D wrought-iron balconies at the levels the facade texture marks.
-  const upperWorld = spec.height * 0.84; // texture: bottom 16% is the shopfront band
+  const upperWorld = spec.height * (1 - FACADE_GROUND_BAND_FRAC); // above the shopfront band
   const rowWorld = upperWorld / rows;
   const balconyRows = [1, rows - 2].filter((r) => r >= 0 && r < rows && rows >= 4);
   const balconyLen = facadeLen - 1.0;
@@ -201,6 +223,25 @@ export function buildBuilding(spec: BuildingSpec): BuiltBuilding {
           .rotateY(Math.PI / 2)
           .translate(s * balconyLen * 0.5, yFloor + RAIL_H / 2, wallHalfOut + 0.21),
       );
+    }
+  }
+
+  // --- Real glass panes over the painted window grid (front facade only,
+  // like the balconies). Recomputes the exact grid makeFacadeTextures()
+  // paints — same shared fractions — so glass and painted frames align.
+  // The window sits centered in its cell (X_FRAC + W_FRAC/2 = 0.5), so this
+  // also holds on faces where the texture U direction is mirrored.
+  {
+    const cellW = facadeLen / facadeCols;
+    const paneW = cellW * WINDOW_W_FRAC;
+    for (let r = 0; r < rows; r++) {
+      const paneH = rowWorld * WINDOW_H_FRAC;
+      const py = spec.height - (r + WINDOW_Y_FRAC + WINDOW_H_FRAC / 2) * rowWorld;
+      for (let c = 0; c < facadeCols; c++) {
+        const px = -facadeLen / 2 + (c + WINDOW_X_FRAC + WINDOW_W_FRAC / 2) * cellW;
+        // Just proud of the painted stone, well behind the balcony rail (+0.43).
+        glassGeos.push(new THREE.PlaneGeometry(paneW, paneH).translate(px, py, wallHalfOut + 0.02));
+      }
     }
   }
 
@@ -290,6 +331,7 @@ export function buildBuilding(spec: BuildingSpec): BuiltBuilding {
     [dormerGeos, matPlain],
     [dormerCapGeos, roofMat],
     [paneGeos, paneMat],
+    [glassGeos, glassMat],
   ];
   for (const [geos, mat] of buckets) {
     const mesh = mergedMesh(geos, mat);

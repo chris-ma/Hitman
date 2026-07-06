@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { makeRoadDashTexture, makeCobblestoneTexture, makeCrosswalkTexture } from './proceduralTextures';
+import {
+  makeRoadDashTexture,
+  makeCobblestoneTextures,
+  makeCrosswalkTexture,
+  makeAsphaltBumpMap,
+} from './proceduralTextures';
 
 export interface BuiltGround {
   group: THREE.Group;
@@ -13,26 +18,48 @@ export function buildGround(): BuiltGround {
   const group = new THREE.Group();
   const walkables: THREE.Mesh[] = [];
 
+  const asphaltBump = makeAsphaltBumpMap();
+
+  /** Clone the asphalt bump with a per-surface repeat (~1 tile / 4 units). */
+  const bumpFor = (w: number, d: number): THREE.Texture => {
+    const t = asphaltBump.clone();
+    t.repeat.set(Math.max(1, Math.round(w / 4)), Math.max(1, Math.round(d / 4)));
+    return t;
+  };
+
   // Base plane: generic urban pavement everywhere.
   const base = new THREE.Mesh(
     new THREE.PlaneGeometry(500, 500),
-    new THREE.MeshStandardMaterial({ color: 0x4a484c, roughness: 1 }),
+    new THREE.MeshStandardMaterial({
+      color: 0x4a484c,
+      roughness: 1,
+      envMapIntensity: 0.2,
+      bumpMap: bumpFor(500, 500),
+      bumpScale: 0.025,
+    }),
   );
   base.rotation.x = -Math.PI / 2;
   group.add(base);
   walkables.push(base);
 
-  const asphalt = new THREE.MeshStandardMaterial({ color: 0x323236, roughness: 0.95 });
+  const asphaltFor = (w: number, d: number) =>
+    new THREE.MeshStandardMaterial({
+      color: 0x323236,
+      roughness: 0.95,
+      envMapIntensity: 0.25,
+      bumpMap: bumpFor(w, d),
+      bumpScale: 0.025,
+    });
 
   // Main boulevard (east-west), extended west to reach the tower plaza.
-  const mainRoad = new THREE.Mesh(new THREE.PlaneGeometry(230, 16), asphalt);
+  const mainRoad = new THREE.Mesh(new THREE.PlaneGeometry(230, 16), asphaltFor(230, 16));
   mainRoad.rotation.x = -Math.PI / 2;
   mainRoad.position.set(-15, 0.04, 0);
   group.add(mainRoad);
   walkables.push(mainRoad);
 
   // Cross street (north-south).
-  const crossRoad = new THREE.Mesh(new THREE.PlaneGeometry(16, 170), asphalt);
+  const crossRoad = new THREE.Mesh(new THREE.PlaneGeometry(16, 170), asphaltFor(16, 170));
   crossRoad.rotation.x = -Math.PI / 2;
   crossRoad.position.set(0, 0.04, 0);
   group.add(crossRoad);
@@ -60,7 +87,7 @@ export function buildGround(): BuiltGround {
   group.add(crossDash);
 
   // Sidewalks: raised slabs so the ground-snap raycast steps the player up.
-  const walkMat = new THREE.MeshStandardMaterial({ color: 0x6e6862, roughness: 1 });
+  const walkMat = new THREE.MeshStandardMaterial({ color: 0x6e6862, roughness: 1, envMapIntensity: 0.2 });
   const addSidewalk = (cx: number, cz: number, w: number, d: number) => {
     const s = new THREE.Mesh(new THREE.BoxGeometry(w, SIDEWALK_H, d), walkMat);
     s.position.set(cx, SIDEWALK_H / 2, cz);
@@ -100,11 +127,18 @@ export function buildGround(): BuiltGround {
   addCrosswalk(0, 10.5, Math.PI / 2); // south side
 
   // Tower plaza: broad esplanade of granite setts at the west end.
-  const cobbleTex = makeCobblestoneTexture();
+  const { map: cobbleTex, bumpMap: cobbleBump } = makeCobblestoneTextures();
   cobbleTex.repeat.set(34, 42);
+  cobbleBump.repeat.set(34, 42);
   const plaza = new THREE.Mesh(
     new THREE.BoxGeometry(90, 0.1, 110),
-    new THREE.MeshStandardMaterial({ map: cobbleTex, roughness: 1 }),
+    new THREE.MeshStandardMaterial({
+      map: cobbleTex,
+      roughness: 1,
+      envMapIntensity: 0.25,
+      bumpMap: cobbleBump,
+      bumpScale: 0.04,
+    }),
   );
   plaza.position.set(-152, 0.05, 0);
   group.add(plaza);

@@ -103,6 +103,11 @@ export class Enemy {
     }
 
     for (const m of this.hittables) m.userData.enemy = this;
+
+    // Every body part casts a shadow so enemies visually ground on the street.
+    this.group.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) o.castShadow = true;
+    });
   }
 
   takeDamage(amount: number): void {
