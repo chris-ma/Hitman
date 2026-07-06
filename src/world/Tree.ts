@@ -24,8 +24,35 @@ export function buildTrees(specs: TreeSpec[]): BuiltTrees {
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, specs.length);
 
   // Two canopy blobs per tree: a wide main crown and a smaller top tuft.
-  const canopyGeo = new THREE.IcosahedronGeometry(1, 1);
+  const canopyGeo = new THREE.IcosahedronGeometry(1, 2);
   const canopyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
+  // Per-instance vertex displacement: each canopy blob pushes its vertices
+  // along their (radial) normals by a cheap value noise hashed from
+  // gl_InstanceID, so no two crowns share the same lumpy silhouette. Lives
+  // entirely in the vertex shader — the whole avenue is still 2 draw calls.
+  // (Radial normals keep duplicated flat-shading vertices coincident, and the
+  // flat-shading fragment path re-derives face normals, so no cracks and no
+  // manual normal fixup.)
+  canopyMat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      /* glsl */ `
+      #include <begin_vertex>
+      #ifdef USE_INSTANCING
+        float canopySeed = float( gl_InstanceID );
+      #else
+        float canopySeed = 0.0;
+      #endif
+      {
+        vec3 np = position * 2.1 + canopySeed * 17.31;
+        float n = sin( np.x * 1.7 + canopySeed * 1.3 ) * sin( np.y * 2.3 + canopySeed * 0.7 ) * sin( np.z * 1.9 + canopySeed * 2.1 );
+        float n2 = sin( np.x * 4.7 + np.y * 3.1 ) * sin( np.z * 5.3 - np.y * 2.9 );
+        float amp = 0.16 + 0.10 * fract( canopySeed * 0.6180339 );
+        transformed += normal * ( n * amp + n2 * 0.07 );
+      }
+      `,
+    );
+  };
   const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, specs.length * 2);
 
   const m = new THREE.Matrix4();

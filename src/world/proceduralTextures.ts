@@ -575,6 +575,39 @@ export function makeSkyTexture(): THREE.CanvasTexture {
   return toTexture(canvas);
 }
 
+/**
+ * Soft tileable alpha-noise for the ground-hugging mist plane: dozens of
+ * faint radial blobs tinted to the dusk fog palette, drawn wrapped so the
+ * texture repeats seamlessly. Deliberately very low alpha — the mist should
+ * read as atmosphere, not obscure gameplay.
+ */
+export function makeMistTexture(): THREE.CanvasTexture {
+  const S = 256;
+  const [canvas, ctx] = makeCanvas(S, S);
+  ctx.clearRect(0, 0, S, S);
+  const rng = makeRng(4242);
+  for (let i = 0; i < 26; i++) {
+    const r = 16 + rng() * 38;
+    const x = rng() * S;
+    const y = rng() * S;
+    const a = 0.03 + rng() * 0.06;
+    // Draw at all wrapped offsets so blobs crossing an edge tile seamlessly.
+    for (const ox of [-S, 0, S]) {
+      for (const oy of [-S, 0, S]) {
+        const g = ctx.createRadialGradient(x + ox, y + oy, r * 0.12, x + ox, y + oy, r);
+        g.addColorStop(0, `rgba(232,186,150,${a.toFixed(3)})`);
+        g.addColorStop(1, 'rgba(232,186,150,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+      }
+    }
+  }
+  const tex = toTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
 /** Radial white-to-transparent burst for the muzzle flash sprite. */
 export function makeFlashTexture(): THREE.CanvasTexture {
   const S = 64;

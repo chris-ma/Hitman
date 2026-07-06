@@ -130,6 +130,16 @@
   font-weight: 400;
   opacity: 0.75;
 }
+.hud-ammo .reloading {
+  display: block;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: #ffd987;
+  text-align: right;
+  animation: hud-pulse 0.5s ease-in-out infinite;
+}
 
 /* Top-center objective */
 .hud-objective {

@@ -13,6 +13,10 @@ import {
   GROUND_SNAP_TOLERANCE,
   SPAWN_POSITION,
   SPAWN_YAW,
+  WORLD_BOUND_MIN_X,
+  WORLD_BOUND_MAX_X,
+  WORLD_BOUND_MIN_Z,
+  WORLD_BOUND_MAX_Z,
 } from '../constants';
 
 /**
@@ -81,6 +85,11 @@ export class PlayerController {
 
     // --- Building / tower-leg collision (XZ push-out) ---
     resolveCircleAABBs(pos, PLAYER_RADIUS, this.world.collidables);
+
+    // --- Invisible district perimeter: a direct clamp (no wall boxes, so no
+    // corner gaps) keeps the player inside the built city. ---
+    pos.x = THREE.MathUtils.clamp(pos.x, WORLD_BOUND_MIN_X, WORLD_BOUND_MAX_X);
+    pos.z = THREE.MathUtils.clamp(pos.z, WORLD_BOUND_MIN_Z, WORLD_BOUND_MAX_Z);
 
     // --- Gravity + jump ---
     if (this.input.isDown('Space') && this.grounded) {

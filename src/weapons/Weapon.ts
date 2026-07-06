@@ -5,19 +5,22 @@ import { Enemy } from '../enemies/Enemy';
 import { World } from '../world/World';
 import { ShootEffects } from './ShootEffects';
 import { WeaponModel } from './WeaponModel';
-import { AMMO_MAX, FIRE_COOLDOWN, WEAPON_DAMAGE, WEAPON_RANGE } from '../constants';
+import { MAGAZINE_SIZE, RESERVE_AMMO_MAX, RELOAD_TIME, FIRE_COOLDOWN, WEAPON_DAMAGE, WEAPON_RANGE } from '../constants';
 
 /**
  * Hitscan pistol: raycast from screen center against enemies + world
- * occluders (walls block bullets). Handles cooldown, ammo, and effect
+ * occluders (walls block bullets). Handles cooldown, the magazine/reserve
+ * ammo split with an automatic reload on an empty magazine, and effect
  * triggering. Fires while the button is held.
  */
 export class Weapon {
-  ammo = AMMO_MAX;
+  magazineAmmo = MAGAZINE_SIZE;
+  reserveAmmo = RESERVE_AMMO_MAX;
   /** Set by Game so the HUD can flash a hit marker. */
   onHit: (() => void) | null = null;
 
   private cooldown = 0;
+  private reloadTimer = 0;
   private ray = new THREE.Raycaster();
   private muzzlePos = new THREE.Vector3();
   private dir = new THREE.Vector3();
@@ -33,21 +36,43 @@ export class Weapon {
     this.ray.far = WEAPON_RANGE;
   }
 
+  get reloading(): boolean {
+    return this.reloadTimer > 0;
+  }
+
   resetAmmo(): void {
-    this.ammo = AMMO_MAX;
+    this.magazineAmmo = MAGAZINE_SIZE;
+    this.reserveAmmo = RESERVE_AMMO_MAX;
+    this.reloadTimer = 0;
   }
 
   update(dt: number): void {
     this.model.update(dt);
     if (this.cooldown > 0) this.cooldown -= dt;
-    if (this.input.fireHeld && this.cooldown <= 0 && this.ammo > 0) {
+
+    // Reload gate: same countdown pattern as the fire cooldown. When the
+    // timer completes, top the magazine up from reserve.
+    if (this.reloadTimer > 0) {
+      this.reloadTimer -= dt;
+      if (this.reloadTimer <= 0) {
+        const moved = Math.min(MAGAZINE_SIZE - this.magazineAmmo, this.reserveAmmo);
+        this.magazineAmmo += moved;
+        this.reserveAmmo -= moved;
+      }
+      return; // firing is blocked while reloading
+    }
+
+    if (this.input.fireHeld && this.cooldown <= 0 && this.magazineAmmo > 0) {
       this.fire();
       this.cooldown = FIRE_COOLDOWN;
     }
   }
 
   private fire(): void {
-    this.ammo--;
+    this.magazineAmmo--;
+    // Auto-reload the moment the magazine runs dry (if there's reserve left;
+    // otherwise the player is simply out of ammo).
+    if (this.magazineAmmo === 0 && this.reserveAmmo > 0) this.reloadTimer = RELOAD_TIME;
     this.model.onFire();
 
     this.camera.getWorldDirection(this.dir);

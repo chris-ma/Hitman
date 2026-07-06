@@ -13,6 +13,17 @@ export interface BuildingSpec {
   roofType: 'mansard' | 'flat';
   rotationY?: number;
   facadeColorHex?: string;
+  /** Cut the street corner facing the junction at 45° (boulevard corner buildings). */
+  canted?: boolean;
+}
+
+export interface CarSpec {
+  x: number;
+  z: number;
+  /** Yaw. City data uses axis-aligned quarter turns only (0, ±PI/2, PI). */
+  rotationY: number;
+  /** Index into the shared paint-color variants. */
+  variant: number;
 }
 
 export interface StreetlightSpec {
@@ -45,8 +56,8 @@ export const BUILDINGS: BuildingSpec[] = [
   { x: -78, z: -18, width: 16, depth: 12, height: 24, floors: 7, roofType: 'mansard', facadeColorHex: CREAM },
   { x: -60, z: -18, width: 16, depth: 12, height: 27, floors: 8, roofType: 'mansard', facadeColorHex: BEIGE },
   { x: -42, z: -18, width: 16, depth: 12, height: 22, floors: 6, roofType: 'flat', facadeColorHex: PALE },
-  { x: -24, z: -18, width: 14, depth: 12, height: 25, floors: 7, roofType: 'mansard', facadeColorHex: SAND },
-  { x: 24, z: -18, width: 14, depth: 12, height: 26, floors: 7, roofType: 'mansard', facadeColorHex: CREAM },
+  { x: -24, z: -18, width: 14, depth: 12, height: 25, floors: 7, roofType: 'mansard', facadeColorHex: SAND, canted: true },
+  { x: 24, z: -18, width: 14, depth: 12, height: 26, floors: 7, roofType: 'mansard', facadeColorHex: CREAM, canted: true },
   { x: 42, z: -18, width: 16, depth: 12, height: 23, floors: 6, roofType: 'mansard', facadeColorHex: PALE },
   { x: 60, z: -18, width: 16, depth: 12, height: 27, floors: 8, roofType: 'flat', facadeColorHex: BEIGE },
   { x: 78, z: -18, width: 16, depth: 12, height: 24, floors: 7, roofType: 'mansard', facadeColorHex: SAND },
@@ -54,8 +65,8 @@ export const BUILDINGS: BuildingSpec[] = [
   // South row (z = +18, fronts at z = +12)
   { x: -70, z: 18, width: 20, depth: 12, height: 25, floors: 7, roofType: 'mansard', facadeColorHex: BEIGE },
   { x: -48, z: 18, width: 18, depth: 12, height: 22, floors: 6, roofType: 'mansard', facadeColorHex: PALE },
-  { x: -27, z: 18, width: 16, depth: 12, height: 27, floors: 8, roofType: 'flat', facadeColorHex: CREAM },
-  { x: 25, z: 18, width: 16, depth: 12, height: 24, floors: 7, roofType: 'mansard', facadeColorHex: SAND },
+  { x: -27, z: 18, width: 16, depth: 12, height: 27, floors: 8, roofType: 'flat', facadeColorHex: CREAM, canted: true },
+  { x: 25, z: 18, width: 16, depth: 12, height: 24, floors: 7, roofType: 'mansard', facadeColorHex: SAND, canted: true },
   { x: 45, z: 18, width: 18, depth: 12, height: 26, floors: 7, roofType: 'mansard', facadeColorHex: CREAM },
   { x: 66, z: 18, width: 16, depth: 12, height: 22, floors: 6, roofType: 'mansard', facadeColorHex: BEIGE },
   { x: 83, z: 18, width: 12, depth: 12, height: 25, floors: 7, roofType: 'flat', facadeColorHex: PALE },
@@ -126,6 +137,25 @@ export const WALLACE_FOUNTAINS: TreeSpec[] = [
 
 // Guimard Métro entrance on the plaza, opening toward the boulevard.
 export const METRO_ENTRANCE = { x: -111, z: -20 };
+
+// Parked cars hugging the curbs (road z in [-8, 8] on the boulevard, x in
+// [-8, 8] on the cross street). Kept clear of crosswalks (|x| < 12 at the
+// junction), enemy patrol lines (|z| = 4 lanes) and the Wallace fountains.
+export const CARS: CarSpec[] = [
+  // Boulevard, north curb
+  { x: 46, z: -6.9, rotationY: -Math.PI / 2, variant: 0 },
+  { x: 27, z: -6.9, rotationY: -Math.PI / 2, variant: 1 },
+  { x: -38, z: -6.9, rotationY: Math.PI / 2, variant: 2 },
+  { x: -70, z: -6.9, rotationY: Math.PI / 2, variant: 1 },
+  // Boulevard, south curb
+  { x: 55, z: 6.9, rotationY: Math.PI / 2, variant: 2 },
+  { x: 18, z: 6.9, rotationY: Math.PI / 2, variant: 0 },
+  { x: -30, z: 6.9, rotationY: Math.PI / 2, variant: 1 },
+  { x: -78, z: 6.9, rotationY: Math.PI / 2, variant: 0 },
+  // Cross street
+  { x: 6.9, z: 40, rotationY: 0, variant: 2 },
+  { x: -6.9, z: -38, rotationY: Math.PI, variant: 0 },
+];
 
 export const ENEMIES: EnemySpec[] = [
   // Boulevard

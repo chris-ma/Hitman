@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { EnemySpec } from '../world/cityData';
+import { makeRng } from '../world/proceduralTextures';
 import {
   ENEMY_MAX_HEALTH,
   ENEMY_FIRE_RANGE,
@@ -16,6 +17,75 @@ const SKIN = 0xd9a184;
 const PATROL_SPEED = 2.2;
 const FLASH_TIME = 0.12;
 
+function lathe(points: Array<[number, number]>, segments: number): THREE.LatheGeometry {
+  return new THREE.LatheGeometry(
+    points.map(([r, y]) => new THREE.Vector2(r, y)),
+    segments,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared body geometry, authored once at module load and reused by every
+// enemy (same pattern as shared materials — zero extra draw calls). Lathe
+// profiles replace the old uniform capsules: the torso tapers from a broader
+// chest to a narrower waist, thighs taper into shins, biceps into forearms.
+// All spans match the capsules they replace (torso ~0.78..1.59 etc.) so the
+// walk-cycle pivots and hit registration are unchanged.
+// ---------------------------------------------------------------------------
+
+// Torso: hips → waist → chest → shoulders. Spans world y 0.78..1.59.
+const TORSO_GEO = lathe(
+  [
+    [0.02, 0.0],
+    [0.24, 0.025],
+    [0.295, 0.09], // hips
+    [0.27, 0.3], // waist
+    [0.3, 0.5],
+    [0.335, 0.64], // chest
+    [0.32, 0.73], // shoulders
+    [0.2, 0.79],
+    [0.02, 0.81],
+  ],
+  12,
+).translate(0, 0.78, 0);
+
+// Leg: hangs below the hip pivot (y 0 at the pivot, -0.75 at the sole).
+const LEG_GEO = lathe(
+  [
+    [0.02, 0.0],
+    [0.08, 0.015],
+    [0.088, 0.06], // ankle
+    [0.1, 0.28], // calf
+    [0.105, 0.42], // knee
+    [0.135, 0.6], // thigh
+    [0.145, 0.7],
+    [0.09, 0.745],
+    [0.02, 0.75],
+  ],
+  10,
+).translate(0, -0.75, 0);
+
+// Arm: hangs below the shoulder pivot (y 0 at the pivot, -0.69 at the hand).
+const ARM_GEO = lathe(
+  [
+    [0.015, 0.0],
+    [0.055, 0.012],
+    [0.06, 0.05], // wrist
+    [0.072, 0.28], // forearm
+    [0.082, 0.45], // elbow
+    [0.095, 0.58], // bicep
+    [0.09, 0.665],
+    [0.02, 0.69],
+  ],
+  8,
+).translate(0, -0.69, 0);
+
+const HEAD_GEO = new THREE.SphereGeometry(0.21, 12, 10);
+const HAIR_GEO = new THREE.SphereGeometry(0.215, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
+const SHIRT_GEO = new THREE.BoxGeometry(0.2, 0.4, 0.04);
+const TIE_GEO = new THREE.BoxGeometry(0.07, 0.34, 0.03);
+const GUN_GEO = new THREE.BoxGeometry(0.05, 0.1, 0.26);
+
 export interface EnemyShotResult {
   hit: boolean;
   from: THREE.Vector3;
@@ -24,9 +94,10 @@ export interface EnemyShotResult {
 }
 
 /**
- * Capsule-primitive hostile. Stationary or two-point ping-pong patrol;
+ * Lathe-profile primitive hostile. Stationary or two-point ping-pong patrol;
  * optionally returns periodic hitscan fire when the player is in range and
- * line-of-sight. Death is a scripted fall-over + fade.
+ * line-of-sight. Death is a scripted fall-over + fade. Proportions vary
+ * per enemy (seeded from spawn position) so the guards aren't identical.
  */
 export class Enemy {
   readonly group = new THREE.Group();
@@ -42,6 +113,8 @@ export class Enemy {
   private headWorld = new THREE.Vector3();
   private losRay = new THREE.Raycaster();
   private tmp = new THREE.Vector3();
+  /** Per-enemy overall height multiplier (proportion variation). */
+  private heightScale = 1;
   // Walk-cycle state. walkPhase only advances while actually patrolling, so a
   // phase of 0 (or any frozen value) evaluates to a coherent standing pose.
   private walkPhase = 0;
@@ -56,6 +129,19 @@ export class Enemy {
     this.group.position.set(spec.x, 0, spec.z);
     if (spec.facing !== undefined) this.group.rotation.y = spec.facing;
 
+    // Deterministic per-enemy proportions, seeded from the spawn position
+    // (same scheme as building facade seeds). Pure transform variation on
+    // shared geometry — no extra geometry or draw calls.
+    const prng = makeRng(((Math.round(spec.x * 7) * 73856093) ^ (Math.round(spec.z * 7) * 19349663)) >>> 0);
+    this.heightScale = 0.96 + prng() * 0.1; // 0.96..1.06
+    const torsoW = 0.94 + prng() * 0.14; // chest/shoulder width
+    const torsoD = 0.95 + prng() * 0.1; // chest depth
+    const legT = 0.95 + prng() * 0.12; // leg thickness
+    const armT = 0.95 + prng() * 0.1; // arm thickness
+    const headW = 0.95 + prng() * 0.1;
+    const headD = 0.96 + prng() * 0.09;
+    this.group.scale.y = this.heightScale;
+
     const bodyMat = new THREE.MeshStandardMaterial({ color: SUIT, roughness: 0.85 });
     const headMat = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.9 });
     const tieMat = new THREE.MeshStandardMaterial({ color: 0xb02030, roughness: 0.8 });
@@ -66,10 +152,10 @@ export class Enemy {
     // groups stay direct children of `group` and swing from the hips.
     this.group.add(this.upperBody);
 
-    // Torso: same radius and same top (~1.59) as the old full-height capsule,
-    // but stopping at the hips (~0.78) so the legs can articulate below it.
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.17, 4, 10), bodyMat);
-    torso.position.y = 1.185; // spans ~0.78 .. 1.59
+    // Torso: tapered lathe spanning the same ~0.78..1.59 band the old
+    // capsule occupied, stopping at the hips so the legs articulate below.
+    const torso = new THREE.Mesh(TORSO_GEO, bodyMat);
+    torso.scale.set(torsoW, 1, torsoD);
     this.upperBody.add(torso);
     this.hittables.push(torso);
 
@@ -78,8 +164,8 @@ export class Enemy {
     const makeLeg = (s: number): THREE.Group => {
       const hip = new THREE.Group();
       hip.position.set(s * 0.11, 0.78, 0);
-      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.49, 3, 7), bodyMat);
-      leg.position.y = -0.375; // spans ~0.03 .. 0.78 below the hip pivot
+      const leg = new THREE.Mesh(LEG_GEO, bodyMat);
+      leg.scale.set(legT, 1, legT);
       hip.add(leg);
       this.group.add(hip);
       this.hittables.push(leg);
@@ -88,30 +174,29 @@ export class Enemy {
     this.legGroupL = makeLeg(-1);
     this.legGroupR = makeLeg(1);
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), headMat);
+    const head = new THREE.Mesh(HEAD_GEO, headMat);
     head.position.y = 1.8;
+    head.scale.set(headW, 1, headD);
     this.upperBody.add(head);
     this.hittables.push(head);
 
     const shirtMat = new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.9 });
-    const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 0.04), shirtMat);
-    shirt.position.set(0, 1.22, 0.295);
+    const shirt = new THREE.Mesh(SHIRT_GEO, shirtMat);
+    shirt.position.set(0, 1.24, 0.272 * torsoD);
     this.upperBody.add(shirt);
     this.materials.push(shirtMat);
 
-    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.34, 0.03), tieMat);
-    tie.position.set(0, 1.22, 0.325);
+    const tie = new THREE.Mesh(TIE_GEO, tieMat);
+    tie.position.set(0, 1.22, 0.302 * torsoD);
     this.upperBody.add(tie);
 
     // --- Cosmetic detail (not raycast targets, no gameplay effect) ---
 
     // Short dark hair: a cap over the top of the head sphere.
     const hairMat = new THREE.MeshStandardMaterial({ color: 0x2b2118, roughness: 0.95 });
-    const hair = new THREE.Mesh(
-      new THREE.SphereGeometry(0.215, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
-      hairMat,
-    );
+    const hair = new THREE.Mesh(HAIR_GEO, hairMat);
     hair.position.y = 1.815;
+    hair.scale.set(headW, 1, headD);
     this.upperBody.add(hair);
     this.materials.push(hairMat);
 
@@ -120,10 +205,10 @@ export class Enemy {
     // the mesh offset keeps the arm's rest position identical to before.
     const makeArm = (s: number): THREE.Group => {
       const shoulder = new THREE.Group();
-      shoulder.position.set(s * 0.4, 1.445, 0);
+      shoulder.position.set(s * 0.4 * torsoW, 1.445, 0);
       shoulder.rotation.z = s * -0.14;
-      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.52, 3, 7), bodyMat);
-      arm.position.y = -0.345;
+      const arm = new THREE.Mesh(ARM_GEO, bodyMat);
+      arm.scale.set(armT, 1, armT);
       shoulder.add(arm);
       this.upperBody.add(shoulder);
       return shoulder;
@@ -131,10 +216,17 @@ export class Enemy {
     this.armGroupL = makeArm(-1);
     this.armGroupR = makeArm(1);
 
-    // Armed guards visibly carry a pistol at the right hip.
+    // Armed guards visibly carry a pistol at the right hip. Thin lacquer
+    // clearcoat gives the gunmetal a subtle sheen (narrow-scope A4 material).
     if (spec.shoots) {
-      const gunMat = new THREE.MeshStandardMaterial({ color: 0x1c1e23, roughness: 0.4, metalness: 0.6 });
-      const gun = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.26), gunMat);
+      const gunMat = new THREE.MeshPhysicalMaterial({
+        color: 0x1c1e23,
+        roughness: 0.4,
+        metalness: 0.6,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.35,
+      });
+      const gun = new THREE.Mesh(GUN_GEO, gunMat);
       gun.position.set(0.42, 0.82, 0.2);
       gun.rotation.x = -0.15;
       this.upperBody.add(gun);
@@ -243,7 +335,7 @@ export class Enemy {
     this.fireTimer -= dt;
     if (this.fireTimer > 0) return null;
 
-    this.headWorld.set(this.group.position.x, 1.8, this.group.position.z);
+    this.headWorld.set(this.group.position.x, 1.8 * this.heightScale, this.group.position.z);
     const toPlayer = this.tmp.subVectors(playerPos, this.headWorld);
     const dist = toPlayer.length();
     if (dist > ENEMY_FIRE_RANGE) return null;

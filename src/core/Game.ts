@@ -11,6 +11,7 @@ import { Weapon } from '../weapons/Weapon';
 import { WeaponModel } from '../weapons/WeaponModel';
 import { ShootEffects } from '../weapons/ShootEffects';
 import { EnemyManager } from '../enemies/EnemyManager';
+import { Debris } from '../world/Debris';
 import { HUD } from '../ui/HUD';
 import { getViewportSize, onViewportChange } from '../utils/device';
 
@@ -31,6 +32,7 @@ export class Game {
   private effects: ShootEffects;
   private weapon: Weapon;
   private enemies: EnemyManager;
+  private debris: Debris;
   private hud: HUD;
   private touchControls: TouchControls | null = null;
   private clock = new THREE.Clock();
@@ -51,6 +53,7 @@ export class Game {
       this.touchControls = new TouchControls(container, this.input);
     }
     this.enemies = new EnemyManager(scene, this.world, this.player, this.effects);
+    this.debris = new Debris(scene);
     this.weapon = new Weapon(camera, this.input, this.enemies, this.world, this.effects, weaponModel);
 
     this.weapon.onHit = () => this.hud.flashHitmarker();
@@ -121,9 +124,12 @@ export class Game {
     }
 
     this.effects.update(dt);
+    // Ambient systems run in every state so the scene never freezes behind overlays.
+    this.debris.update(dt, this.setup.camera.position);
+    this.setup.update(dt);
 
     this.hud.setHealth(this.player.health);
-    this.hud.setAmmo(this.weapon.ammo);
+    this.hud.setAmmo(this.weapon.magazineAmmo, this.weapon.reserveAmmo, this.weapon.reloading);
     this.hud.setObjective(this.enemies.kills, this.enemies.total);
 
     // Sun-follow runs in every state so the background stays correctly lit

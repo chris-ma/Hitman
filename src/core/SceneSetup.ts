@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeSkyTexture } from '../world/proceduralTextures';
+import { makeSkyTexture, makeMistTexture } from '../world/proceduralTextures';
 import { buildEnvironmentTexture } from '../world/Environment';
 import { IS_TOUCH_DEVICE, getViewportSize } from '../utils/device';
 
@@ -14,6 +14,8 @@ export class SceneSetup {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
   private readonly sun: THREE.DirectionalLight;
+  /** Slowly drifting ground-mist textures, scrolled every frame in update(). */
+  private readonly mistTextures: THREE.CanvasTexture[] = [];
 
   constructor(container: HTMLElement) {
     const { width, height } = getViewportSize();
@@ -37,6 +39,31 @@ export class SceneSetup {
     // world edge dissolves instead of hard-cutting. Far enough to keep the
     // tower visible from spawn (~200 units away).
     this.scene.fog = new THREE.Fog(0xdb9a70, 90, 480);
+
+    // Ground-hugging mist: two big semi-transparent planes just above street
+    // level with a slowly scrolling alpha-noise texture. Purely atmospheric —
+    // non-colliding, depth-write off so it never occludes or breaks sorting.
+    for (const [y, repX, repY, opacity] of [
+      [0.5, 13, 8, 0.2],
+      [0.95, 9, 6, 0.13],
+    ] as const) {
+      const tex = makeMistTexture();
+      tex.repeat.set(repX, repY);
+      this.mistTextures.push(tex);
+      const mist = new THREE.Mesh(
+        new THREE.PlaneGeometry(470, 300),
+        new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          opacity,
+          depthWrite: false,
+        }),
+      );
+      mist.rotation.x = -Math.PI / 2;
+      mist.position.set(-52, y, 0); // centered on the built district
+      mist.renderOrder = 2; // after other transparents at the same depth
+      this.scene.add(mist);
+    }
 
     this.camera = new THREE.PerspectiveCamera(72, width / height, 0.1, 900);
     // The camera carries the weapon viewmodel, so it must be in the graph.
@@ -80,6 +107,15 @@ export class SceneSetup {
   updateSunFollow(target: THREE.Vector3): void {
     this.sun.position.set(target.x - 160, target.y + 70, target.z + 55);
     this.sun.target.position.set(target.x, 0, target.z);
+  }
+
+  /** Per-frame ambience: drift the mist layers in slightly different directions. */
+  update(dt: number): void {
+    const [a, b] = this.mistTextures;
+    a.offset.x += dt * 0.006;
+    a.offset.y += dt * 0.0022;
+    b.offset.x -= dt * 0.0035;
+    b.offset.y += dt * 0.0028;
   }
 
   /**

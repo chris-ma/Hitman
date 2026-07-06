@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { BUILDINGS, STREETLIGHTS, TREES, WALLACE_FOUNTAINS, METRO_ENTRANCE } from './cityData';
+import { BUILDINGS, STREETLIGHTS, TREES, WALLACE_FOUNTAINS, METRO_ENTRANCE, CARS } from './cityData';
 import { buildBuilding } from './Building';
+import { buildCars } from './Car';
 import { buildGround } from './Ground';
 import { buildStreetlight } from './Streetlight';
 import { buildEiffelTower } from './EiffelTower';
@@ -45,9 +46,17 @@ export class World {
       const built = buildBuilding(spec);
       scene.add(built.group);
       setShadow(built.group, true, true);
-      this.collidables.push(built.footprint);
+      this.collidables.push(...built.footprints);
       this.occluders.push(...built.occluders);
     }
+
+    // Parked cars along the curbs: solid enough to block movement, bullets
+    // and enemy line-of-sight, exactly like buildings.
+    const cars = buildCars(CARS);
+    scene.add(cars.group);
+    setShadow(cars.group, true, true);
+    this.collidables.push(...cars.footprints);
+    this.occluders.push(...cars.occluders);
 
     // Real PointLights only for the streetlights closest to spawn.
     const bySpawnDistance = [...STREETLIGHTS].sort((a, b) => {

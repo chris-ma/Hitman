@@ -23,7 +23,7 @@ export class HUD {
   private overlayPrompt: HTMLDivElement;
 
   private lastHealth = -1;
-  private lastAmmo = -1;
+  private lastAmmoKey = '';
   private lastObjective = '';
   private overlayMode: OverlayMode = 'none';
   private hitTimer: ReturnType<typeof setTimeout> | null = null;
@@ -75,10 +75,13 @@ export class HUD {
     this.healthFill.classList.toggle('low', pct <= 30);
   }
 
-  setAmmo(ammo: number): void {
-    if (ammo === this.lastAmmo) return;
-    this.lastAmmo = ammo;
-    this.ammoEl.innerHTML = `${ammo} <span>RNDS</span>`;
+  /** Magazine / reserve readout, with a pulsing indicator during reloads. */
+  setAmmo(magazine: number, reserve: number, reloading: boolean): void {
+    const key = `${magazine}|${reserve}|${reloading ? 1 : 0}`;
+    if (key === this.lastAmmoKey) return;
+    this.lastAmmoKey = key;
+    const label = reloading ? '<em class="reloading">RELOADING</em>' : '';
+    this.ammoEl.innerHTML = `${label}${magazine} <span>/ ${reserve}</span>`;
   }
 
   setObjective(kills: number, total: number): void {
