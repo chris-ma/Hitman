@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeSkyTexture } from '../world/proceduralTextures';
 import { buildEnvironmentTexture } from '../world/Environment';
-import { IS_TOUCH_DEVICE } from '../utils/device';
+import { IS_TOUCH_DEVICE, getViewportSize } from '../utils/device';
 
 /**
  * Renderer, scene, camera, and the evening-Paris mood: dusk gradient sky,
@@ -16,11 +16,13 @@ export class SceneSetup {
   private readonly sun: THREE.DirectionalLight;
 
   constructor(container: HTMLElement) {
+    const { width, height } = getViewportSize();
+
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     // Weaker mobile GPUs benefit more from a lower resolution than from AA headroom.
     const maxPixelRatio = IS_TOUCH_DEVICE ? 1.5 : 2;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(width, height);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
@@ -36,7 +38,7 @@ export class SceneSetup {
     // tower visible from spawn (~200 units away).
     this.scene.fog = new THREE.Fog(0xdb9a70, 90, 480);
 
-    this.camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 900);
+    this.camera = new THREE.PerspectiveCamera(72, width / height, 0.1, 900);
     // The camera carries the weapon viewmodel, so it must be in the graph.
     this.scene.add(this.camera);
 
@@ -78,5 +80,18 @@ export class SceneSetup {
   updateSunFollow(target: THREE.Vector3): void {
     this.sun.position.set(target.x - 160, target.y + 70, target.z + 55);
     this.sun.target.position.set(target.x, 0, target.z);
+  }
+
+  /**
+   * Re-fit the camera and renderer to a new viewport size. Must be called on
+   * every resize/orientation change — without it the camera aspect and the
+   * renderer's backing buffer stay locked to whatever size existed at
+   * construction (e.g. a phone's portrait dimensions before the player
+   * rotates to landscape), which is what produces a stretched/cropped canvas.
+   */
+  resize(width: number, height: number): void {
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
   }
 }

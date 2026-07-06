@@ -12,6 +12,7 @@ import { WeaponModel } from '../weapons/WeaponModel';
 import { ShootEffects } from '../weapons/ShootEffects';
 import { EnemyManager } from '../enemies/EnemyManager';
 import { HUD } from '../ui/HUD';
+import { getViewportSize, onViewportChange } from '../utils/device';
 
 /**
  * Top-level orchestration and the render loop.
@@ -76,6 +77,17 @@ export class Game {
       // If dead, the death overlay set in onDeath() stays up.
       this.touchControls?.setPlaying(locked);
     };
+
+    // Centralized resize: keeps the camera aspect, renderer backing buffer,
+    // and post-processing render targets all in sync with the actually-
+    // visible viewport (mobile toolbars and orientation changes can move
+    // this independently of a plain `window.resize`, which previously left
+    // the canvas stretched/cropped after rotating to landscape).
+    onViewportChange(() => {
+      const { width, height } = getViewportSize();
+      this.setup.resize(width, height);
+      this.postProcessing.setSize(width, height);
+    });
 
     renderer.setAnimationLoop(() => this.tick());
 

@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FilmGradeShader } from './shaders/FilmGradeShader';
-import { IS_TOUCH_DEVICE } from '../utils/device';
+import { IS_TOUCH_DEVICE, getViewportSize } from '../utils/device';
 
 // SSAO and bloom render internal buffers at a fraction of full resolution on
 // touch devices; desktop runs them at full size.
@@ -31,8 +31,7 @@ export class PostProcessing {
   private time = 0;
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const { width: w, height: h } = getViewportSize();
     const pr = renderer.getPixelRatio();
 
     const rt = new THREE.WebGLRenderTarget(w * pr, h * pr, {
@@ -71,7 +70,8 @@ export class PostProcessing {
     // raw render-target dimensions, which are already pixel-ratio scaled).
     this.setSize(w, h);
 
-    window.addEventListener('resize', () => this.setSize(window.innerWidth, window.innerHeight));
+    // Resize is driven centrally by Game (alongside SceneSetup.resize()) so
+    // both stay in sync on every viewport change; see Game's constructor.
   }
 
   /** Resize the composer (which resizes every pass's buffers) in CSS pixels. */
